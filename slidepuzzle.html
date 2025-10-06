@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スライディングパズル</title>
+    <style>
+        /* --- スタイルシート (CSS) --- */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #puzzle-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            width: 320px;
+            height: 320px;
+            padding: 10px;
+            background-color: #a0a0a0;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .tile {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #3498db;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            user-select: none; /* テキスト選択を無効に */
+        }
+
+        .tile:hover {
+            background-color: #2980b9;
+        }
+
+        .empty {
+            background-color: transparent;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        #message {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: green;
+            font-weight: bold;
+            height: 25px; /* メッセージ表示用に高さを確保 */
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #e74c3c;
+            color: white;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>スライディングパズル</h1>
+    
+    <div id="puzzle-container"></div>
+    
+    <p id="message"></p>
+    
+    <button id="reset-button">リセット</button>
+
+    <script>
+        // --- ゲームのロジック (JavaScript) ---
+
+        // DOM要素の取得
+        const puzzleContainer = document.getElementById('puzzle-container');
+        const messageElement = document.getElementById('message');
+        const resetButton = document.getElementById('reset-button');
+
+        const SIZE = 4; // 4x4のパズル
+        let board = []; // パズルの状態を管理する2次元配列
+        let emptyPos = { row: 0, col: 0 }; // 空きマスの位置
+
+        /**
+         * ゲームを初期化する関数
+         */
+        function init() {
+            createBoard();
+            shuffleBoard();
+            renderBoard();
+            messageElement.textContent = '';
+        }
+
+        /**
+         * パズルの盤面データ（配列）を作成する
+         */
+        function createBoard() {
+            board = [];
+            let count = 1;
+            for (let i = 0; i < SIZE; i++) {
+                board[i] = [];
+                for (let j = 0; j < SIZE; j++) {
+                    // 最後のマスを空きマス(0)にする
+                    board[i][j] = (count <= SIZE * SIZE - 1) ? count++ : 0;
+                }
+            }
+            emptyPos = { row: SIZE - 1, col: SIZE - 1 };
+        }
+
+        /**
+         * 盤面をシャッフルする
+         * (完成状態からランダムにタイルを動かすことで、必ず解ける盤面を生成する)
+         */
+        function shuffleBoard() {
+            const moves = 1000; // シャッフル回数
+            for (let i = 0; i < moves; i++) {
+                const neighbors = [];
+                const { row, col } = emptyPos;
+                // 空きマスの上下左右のタイルを候補に入れる
+                if (row > 0) neighbors.push({ row: row - 1, col: col });
+                if (row < SIZE - 1) neighbors.push({ row: row + 1, col: col });
+                if (col > 0) neighbors.push({ row: row, col: col - 1 });
+                if (col < SIZE - 1) neighbors.push({ row: row, col: col + 1 });
+                
+                // 候補からランダムに一つ選んで移動させる
+                const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+                swapTiles(emptyPos, randomNeighbor);
+                emptyPos = randomNeighbor;
+            }
+        }
+
+        /**
+         * 盤面をHTMLに描画する
+         */
+        function renderBoard() {
+            puzzleContainer.innerHTML = '';
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    const tileValue = board[i][j];
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    
+                    if (tileValue === 0) {
+                        tile.classList.add('empty');
+                    } else {
+                        tile.textContent = tileValue;
+                        tile.addEventListener('click', () => onTileClick(i, j));
+                    }
+                    puzzleContainer.appendChild(tile);
+                }
+            }
+        }
+
+        /**
+         * タイルがクリックされたときの処理
+         * @param {number} row - クリックされたタイルの行
+         * @param {number} col - クリックされたタイルの列
+         */
+        function onTileClick(row, col) {
+            // 空きマスに隣接しているかチェック
+            const dx = Math.abs(col - emptyPos.col);
+            const dy = Math.abs(row - emptyPos.row);
+
+            if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+                // 隣接していればタイルを交換
+                const clickedPos = { row: row, col: col };
+                swapTiles(emptyPos, clickedPos);
+                emptyPos = clickedPos; // 空きマスの位置を更新
+                
+                renderBoard(); // 再描画
+                checkWin(); // クリア判定
+            }
+        }
+
+        /**
+         * 2つのタイルの位置を入れ替える
+         * @param {object} pos1 - {row, col}
+         * @param {object} pos2 - {row, col}
+         */
+        function swapTiles(pos1, pos2) {
+            const temp = board[pos1.row][pos1.col];
+            board[pos1.row][pos1.col] = board[pos2.row][pos2.col];
+            board[pos2.row][pos2.col] = temp;
+        }
+
+        /**
+         * ゲームクリアを判定する関数
+         */
+        function checkWin() {
+            let count = 1;
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (count <= SIZE * SIZE - 1 && board[i][j] !== count++) {
+                        return; // 順番が違ったら即終了
+                    }
+                }
+            }
+            messageElement.textContent = ' クリア！おめでとう！';
+        }
+
+        // リセットボタンにイベントリスナーを設定
+        resetButton.addEventListener('click', init);
+
+        // --- ゲーム開始 ---
+        init();
+    </script>
+
+</body>
+</html>
